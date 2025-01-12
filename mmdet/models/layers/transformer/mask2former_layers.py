@@ -1,13 +1,16 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import torch
 from mmcv.cnn import build_norm_layer
 from mmengine.model import ModuleList
 from torch import Tensor
 
-from .deformable_detr_layers import DeformableDetrTransformerEncoder
-from .detr_layers import DetrTransformerDecoder, DetrTransformerDecoderLayer
+from .deformable_detr_layers import DeformableDetrTransformerEncoder, DetrTransformerEncoder
+from .detr_layers import DetrTransformerDecoder, DetrTransformerDecoderLayer, DetrTransformerFusionLayer, DetrTransformerFusion
 
 
-class Mask2FormerTransformerEncoder(DeformableDetrTransformerEncoder):
+# class Mask2FormerTransformerEncoder(DetrTransformerEncoder):
+# class Mask2FormerTransformerEncoder(DeformableDetrTransformerEncoder):
+class Mask2FormerTransformerEncoder(DetrTransformerFusion):
     """Encoder in PixelDecoder of Mask2Former."""
 
     def forward(self, query: Tensor, query_pos: Tensor,
@@ -40,16 +43,42 @@ class Mask2FormerTransformerEncoder(DeformableDetrTransformerEncoder):
             called 'encoder output embeddings' or 'memory', has shape
             (bs, num_queries, dim)
         """
-        for layer in self.layers:
-            query = layer(
-                query=query,
-                query_pos=query_pos,
-                key_padding_mask=key_padding_mask,
-                spatial_shapes=spatial_shapes,
-                level_start_index=level_start_index,
-                valid_ratios=valid_ratios,
-                reference_points=reference_points,
-                **kwargs)
+        H, W = spatial_shapes[0]
+        num = H * W # 16x29
+        for i, layer in enumerate(self.layers):   # x6
+            if hasattr(self, 'fusion'):
+                top_query, low_query = query[:,:num], query[:,num:]
+                top_query = layer(
+                    query=top_query,    # 8, 5376, 256
+                    query_pos=query_pos[:,:num],
+                    # key_padding_mask=key_padding_mask[:,:num],
+                    key_padding_mask=None,
+                    spatial_shapes=spatial_shapes,
+                    level_start_index=level_start_index,
+                    valid_ratios=valid_ratios,
+                    reference_points=reference_points,
+                    **kwargs)
+                query = torch.cat([top_query, low_query], dim=1)
+                query = self.fusion[i](
+                    query=query,    # 8, 5376, 256
+                    query_pos=query_pos,
+                    # key_padding_mask=key_padding_mask,
+                    key_padding_mask=None,
+                    spatial_shapes=spatial_shapes,
+                    level_start_index=level_start_index,
+                    valid_ratios=valid_ratios,
+                    reference_points=reference_points,
+                    **kwargs)
+            else:
+                query = layer(
+                    query=query,    # 8, 5376, 256
+                    query_pos=query_pos,
+                    key_padding_mask=key_padding_mask,
+                    spatial_shapes=spatial_shapes,
+                    level_start_index=level_start_index,
+                    valid_ratios=valid_ratios,
+                    reference_points=reference_points,
+                    **kwargs)
         return query
 
 

@@ -401,7 +401,7 @@ class DetLocalVisualizer(Visualizer):
             wait_time: float = 0,
             # TODO: Supported in mmengine's Viusalizer.
             out_file: Optional[str] = None,
-            pred_score_thr: float = 0.3,
+            pred_score_thr: float = 0.015,
             step: int = 0) -> None:
         """Draw datasample and save to all backends.
 

@@ -1,8 +1,8 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from typing import Dict, List, Tuple
-
+import torch
 from torch import Tensor
-
+import torch.nn.functional as F
 from mmdet.registry import MODELS
 from mmdet.structures import SampleList
 from mmdet.utils import ConfigType, OptConfigType, OptMultiConfig
@@ -59,7 +59,17 @@ class MaskFormer(SingleStageDetector):
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
-        x = self.extract_feat(batch_inputs)
+        x = self.extract_feat(batch_inputs) # [256x256x256, 512x128x128, 1024x64x64, 2048x32x32]
+        # if True:
+        #     im = (batch_inputs - batch_inputs.min()) / (batch_inputs.max() - batch_inputs.min()) * 255
+        #     im = im.permute(0, 2, 3, 1).cpu().numpy().astype('uint8')
+        #     import cv2
+        #     for i in range(len(im)):
+        #         print(batch_data_samples[i].gt_instances.labels)
+        #         cv2.imwrite(f'zim_{i}.jpg', im[i])
+        #         mask = batch_data_samples[i].gt_instances.masks.to_ndarray()
+        #         if mask is not None:
+        #             cv2.imwrite(f'zmask_{i}.jpg',  mask[0] * 255)
         losses = self.panoptic_head.loss(x, batch_data_samples)
         return losses
 
@@ -97,16 +107,17 @@ class MaskFormer(SingleStageDetector):
                 - sem_seg (Tensor): panoptic segmentation mask, has a
                     shape (1, h, w).
         """
-        feats = self.extract_feat(batch_inputs)
+        feats = self.extract_feat(batch_inputs) # [256x192x336, 512x96x168, 1024x48x84, 2048x24x42]
         mask_cls_results, mask_pred_results = self.panoptic_head.predict(
-            feats, batch_data_samples)
+            feats, batch_data_samples)  # 1x20x5, 1x20x768x1344
+        return [[F.softmax(mask_cls_results, dim=-1), (torch.sign(mask_pred_results)+1)/2]]
         results_list = self.panoptic_fusion_head.predict(
             mask_cls_results,
             mask_pred_results,
             batch_data_samples,
             rescale=rescale)
         results = self.add_pred_to_datasample(batch_data_samples, results_list)
-
+        # print(type(results), len(results), results[0], results[1]) # DetDataSample has no shape
         return results
 
     def add_pred_to_datasample(self, data_samples: SampleList,

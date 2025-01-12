@@ -361,7 +361,9 @@ class Mask2FormerHead(MaskFormerHead):
         # shape (num_queries, batch_size, c)
         mask_embed = self.mask_embed(decoder_out)
         # shape (num_queries, batch_size, h, w)
-        mask_pred = torch.einsum('bqc,bchw->bqhw', mask_embed, mask_feature)
+        # mask_pred = torch.einsum('bqc,bchw->bqhw', mask_embed, mask_feature)  # same as bmm
+        N, C, H, W = mask_feature.size()
+        mask_pred = torch.bmm(mask_embed, mask_feature.view(N, C, -1)).view(N, -1, H, W)
         attn_mask = F.interpolate(
             mask_pred,
             attn_mask_target_size,
@@ -443,6 +445,7 @@ class Mask2FormerHead(MaskFormerHead):
 
             # cross_attn + self_attn
             layer = self.transformer_decoder.layers[i]
+            # print("Mask2FormerHead %d: " % i, query_feat.shape, decoder_inputs[level_idx].shape, decoder_inputs[level_idx].shape)
             query_feat = layer(
                 query=query_feat,
                 key=decoder_inputs[level_idx],
@@ -460,4 +463,5 @@ class Mask2FormerHead(MaskFormerHead):
             cls_pred_list.append(cls_pred)
             mask_pred_list.append(mask_pred)
 
-        return cls_pred_list, mask_pred_list
+        # print("mmdet/models/dense_heads/mask2former_head.py: forward", len(cls_pred_list), len(mask_pred_list), cls_pred_list[-1].shape, mask_pred_list[-1].shape)
+        return cls_pred_list, mask_pred_list    # [b,20,5]x4, [b,20,256,256]x4

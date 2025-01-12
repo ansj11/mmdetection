@@ -10,7 +10,8 @@ from mmengine.registry import RUNNERS
 from mmengine.runner import Runner
 
 from mmdet.utils import setup_cache_size_limit_of_dynamo
-
+import torch
+# torch.autograd.set_detect_anomaly(True)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
@@ -60,14 +61,14 @@ def parse_args():
 
 
 def main():
-    args = parse_args()
+    args = parse_args() # Namespace(amp=False, auto_scale_lr=False, cfg_options=None, config='configs/mask2former/mask2former_r50_8xb2-fusion-50e_roi.py', launcher='none', local_rank=0, resume=None, work_dir=None)
 
     # Reduce the number of repeated compilations and improve
     # training speed.
     setup_cache_size_limit_of_dynamo()
 
     # load config
-    cfg = Config.fromfile(args.config)
+    cfg = Config.fromfile(args.config)  # configs/mask2former/mask2former_r50_8xb2-fusion-50e_roi.py
     cfg.launcher = args.launcher
     if args.cfg_options is not None:
         cfg.merge_from_dict(args.cfg_options)
@@ -76,13 +77,13 @@ def main():
     if args.work_dir is not None:
         # update configs according to CLI args if args.work_dir is not None
         cfg.work_dir = args.work_dir
-    elif cfg.get('work_dir', None) is None:
+    elif cfg.get('work_dir', None) is None: # True
         # use config filename as default work_dir if cfg.work_dir is None
-        cfg.work_dir = osp.join('./work_dirs',
+        cfg.work_dir = osp.join('./work_dirs',  # ./work_dirs/mask2former_r50_8xb2-fusion-50e_roi
                                 osp.splitext(osp.basename(args.config))[0])
 
     # enable automatic-mixed-precision training
-    if args.amp is True:
+    if args.amp is True:    # False
         optim_wrapper = cfg.optim_wrapper.type
         if optim_wrapper == 'AmpOptimWrapper':
             print_log(
@@ -97,7 +98,7 @@ def main():
             cfg.optim_wrapper.loss_scale = 'dynamic'
 
     # enable automatically scaling LR
-    if args.auto_scale_lr:
+    if args.auto_scale_lr:  # False
         if 'auto_scale_lr' in cfg and \
                 'enable' in cfg.auto_scale_lr and \
                 'base_batch_size' in cfg.auto_scale_lr:
@@ -117,7 +118,7 @@ def main():
         cfg.load_from = args.resume
 
     # build the runner from config
-    if 'runner_type' not in cfg:
+    if 'runner_type' not in cfg:    # True
         # build the default runner
         runner = Runner.from_cfg(cfg)
     else:

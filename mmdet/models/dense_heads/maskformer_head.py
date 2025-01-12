@@ -167,8 +167,8 @@ class MaskFormerHead(AnchorFreeHead):
                 - masks (Tensor): Ground truth mask for a\
                     image, with shape (n, h, w).
         """
-        num_things_list = [self.num_things_classes] * len(batch_gt_instances)
-        num_stuff_list = [self.num_stuff_classes] * len(batch_gt_instances)
+        num_things_list = [self.num_things_classes] * len(batch_gt_instances)   # [4,4,4,4]
+        num_stuff_list = [self.num_stuff_classes] * len(batch_gt_instances)     # [0,0,0,0]
         gt_labels_list = [
             gt_instances['labels'] for gt_instances in batch_gt_instances
         ]
@@ -177,7 +177,7 @@ class MaskFormerHead(AnchorFreeHead):
         ]
         gt_semantic_segs = [
             None if gt_semantic_seg is None else gt_semantic_seg.sem_seg
-            for gt_semantic_seg in batch_gt_semantic_segs
+            for gt_semantic_seg in batch_gt_semantic_segs   # [None,None,None,None]
         ]
         targets = multi_apply(preprocess_panoptic_gt, gt_labels_list,
                               gt_masks_list, gt_semantic_segs, num_things_list,
@@ -347,7 +347,7 @@ class MaskFormerHead(AnchorFreeHead):
         img_metas_list = [batch_img_metas for _ in range(num_dec_layers)]
         losses_cls, losses_mask, losses_dice = multi_apply(
             self._loss_by_feat_single, all_cls_scores, all_mask_preds,
-            batch_gt_instances_list, img_metas_list)
+            batch_gt_instances_list, img_metas_list)    # 10x[]
 
         loss_dict = dict()
         # loss from the last decoder layer
@@ -518,7 +518,7 @@ class MaskFormerHead(AnchorFreeHead):
         mask_embed = self.mask_embed(out_dec)
         all_mask_preds = torch.einsum('lbqc,bchw->lbqhw', mask_embed,
                                       mask_features)
-
+        print("mmdet/models/dense_heads/maskformer.py: forward", all_cls_scores.shape, all_mask_preds.shape)
         return all_cls_scores, all_mask_preds
 
     def loss(
@@ -598,4 +598,5 @@ class MaskFormerHead(AnchorFreeHead):
             mode='bilinear',
             align_corners=False)
 
+        # print("mmdet/models/dense_heads/maskformer.py: predict", mask_cls_results.shape, mask_pred_results.shape)
         return mask_cls_results, mask_pred_results

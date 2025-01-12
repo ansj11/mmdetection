@@ -149,19 +149,19 @@ class MaskFormerFusionHead(BasePanopticFusionHead):
         max_per_image = self.test_cfg.get('max_per_image', 100)
         num_queries = mask_cls.shape[0]
         # shape (num_queries, num_class)
-        scores = F.softmax(mask_cls, dim=-1)[:, :-1]
+        scores = F.softmax(mask_cls, dim=-1)[:, :-1]    # remove background class
         # shape (num_queries * num_class, )
         labels = torch.arange(self.num_classes, device=mask_cls.device).\
-            unsqueeze(0).repeat(num_queries, 1).flatten(0, 1)
+            unsqueeze(0).repeat(num_queries, 1).flatten(0, 1)   # 0,1,2,3x20
         scores_per_image, top_indices = scores.flatten(0, 1).topk(
-            max_per_image, sorted=False)
+            max_per_image, sorted=False)    # 20
         labels_per_image = labels[top_indices]
 
         query_indices = top_indices // self.num_classes
-        mask_pred = mask_pred[query_indices]
+        mask_pred = mask_pred[query_indices]    # -196~15
 
         # extract things
-        is_thing = labels_per_image < self.num_things_classes
+        is_thing = labels_per_image < self.num_things_classes   # 4
         scores_per_image = scores_per_image[is_thing]
         labels_per_image = labels_per_image[is_thing]
         mask_pred = mask_pred[is_thing]
@@ -169,9 +169,9 @@ class MaskFormerFusionHead(BasePanopticFusionHead):
         mask_pred_binary = (mask_pred > 0).float()
         mask_scores_per_image = (mask_pred.sigmoid() *
                                  mask_pred_binary).flatten(1).sum(1) / (
-                                     mask_pred_binary.flatten(1).sum(1) + 1e-6)
+                                     mask_pred_binary.flatten(1).sum(1) + 1e-6) # mask score
         det_scores = scores_per_image * mask_scores_per_image
-        mask_pred_binary = mask_pred_binary.bool()
+        mask_pred_binary = mask_pred_binary.bool()  # bool mask
         bboxes = mask2bbox(mask_pred_binary)
 
         results = InstanceData()
