@@ -7,7 +7,7 @@ from mmengine.fileio import load
 from mmengine.utils import is_abs
 
 from ..registry import DATASETS
-
+from pdb import set_trace
 
 @DATASETS.register_module()
 class BaseDetDataset(BaseDataset):

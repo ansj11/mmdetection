@@ -8,7 +8,7 @@ from mmengine.fileio import get_local_path
 from mmdet.registry import DATASETS
 from .api_wrappers import COCO
 from .base_det_dataset import BaseDetDataset
-
+from pdb import set_trace
 
 @DATASETS.register_module()
 class CocoDataset(BaseDetDataset):

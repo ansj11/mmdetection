@@ -39,7 +39,8 @@ model = dict(
         norm_cfg=dict(type='BN', requires_grad=False),
         norm_eval=True,
         style='pytorch',
-        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
+        # init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
+        init_cfg=dict(type='Pretrained', checkpoint='/root/.cache/torch/hub/checkpoints/resnet50-0676ba61.pth')),
     panoptic_head=dict(
         type='Mask2FormerHead',
         in_channels=[256, 512, 1024, 2048],  # pass to pixel_decoder inside
@@ -249,3 +250,4 @@ log_processor = dict(type='LogProcessor', window_size=50, by_epoch=False)
 #       or not by default.
 #   - `base_batch_size` = (8 GPUs) x (2 samples per GPU).
 auto_scale_lr = dict(enable=False, base_batch_size=16)
+# auto_scale_lr = dict(enable=False, base_batch_size=8)

@@ -35,102 +35,85 @@ Example:
         python demo/image_demo.py demo/demo.jpg rtmdet-ins_s_8xb32-300e_coco \
         --show
 """
-
+import os
+import mmcv
+import json
+from tqdm import tqdm
+from glob import glob
 from argparse import ArgumentParser
-
+from mmdet.registry import VISUALIZERS
 from mmengine.logging import print_log
+from mmdet.utils import register_all_modules
+from mmdet.apis import init_detector, inference_detector
 
-from mmdet.apis import DetInferencer
-
+from pdb import set_trace
 
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument(
-        'inputs', type=str, help='Input image file or folder path.')
+        'config', type=str, help='Input config file or folder path.')
     parser.add_argument(
-        'model',
-        type=str,
-        help='Config or checkpoint .pth file or the model name '
-        'and alias defined in metafile. The model configuration '
-        'file will try to read from .pth if the parameter is '
-        'a .pth weights file.')
+        'inputs', type=str, help='Input image file or folder path.')
     parser.add_argument('--weights', default=None, help='Checkpoint file')
     parser.add_argument(
         '--out-dir',
         type=str,
         default='outputs',
         help='Output directory of images or prediction results.')
-    parser.add_argument('--texts', help='text prompt')
     parser.add_argument(
         '--device', default='cuda:0', help='Device used for inference')
-    parser.add_argument(
-        '--pred-score-thr',
-        type=float,
-        default=0.3,
-        help='bbox score threshold')
-    parser.add_argument(
-        '--batch-size', type=int, default=1, help='Inference batch size.')
     parser.add_argument(
         '--show',
         action='store_true',
         help='Display the image in a popup window.')
-    parser.add_argument(
-        '--no-save-vis',
-        action='store_true',
-        help='Do not save detection vis results')
-    parser.add_argument(
-        '--no-save-pred',
-        action='store_true',
-        help='Do not save detection json results')
-    parser.add_argument(
-        '--print-result',
-        action='store_true',
-        help='Whether to print the results.')
-    parser.add_argument(
-        '--palette',
-        default='none',
-        choices=['coco', 'voc', 'citys', 'random', 'none'],
-        help='Color palette used for visualization')
-    # only for GLIP
-    parser.add_argument(
-        '--custom-entities',
-        '-c',
-        action='store_true',
-        help='Whether to customize entity names? '
-        'If so, the input text should be '
-        '"cls_name1 . cls_name2 . cls_name3 ." format')
 
-    call_args = vars(parser.parse_args())
 
-    if call_args['no_save_vis'] and call_args['no_save_pred']:
-        call_args['out_dir'] = ''
+    args = parser.parse_args()
 
-    if call_args['model'].endswith('.pth'):
-        print_log('The model is a weight file, automatically '
-                  'assign the model to --weights')
-        call_args['weights'] = call_args['model']
-        call_args['model'] = None
-
-    init_kws = ['model', 'weights', 'device', 'palette']
-    init_args = {}
-    for init_kw in init_kws:
-        init_args[init_kw] = call_args.pop(init_kw)
-
-    return init_args, call_args
+    return args
 
 
 def main():
-    init_args, call_args = parse_args()
-    # TODO: Video and Webcam are currently not supported and
-    #  may consume too much memory if your input folder has a lot of images.
-    #  We will be optimized later.
-    inferencer = DetInferencer(**init_args)
-    inferencer(**call_args)
+    args = parse_args()
+    # config_name = 'mask2former_r50_8xb2-fusion-50e_roi1024'
+    config_name = args.config
+    config_file = f"configs/mask2former/{config_name}.py"
+    if args.weights:
+        checkpoint_file = args.weights
+    else:
+        # checkpoint_file = f"work_dirs/{config_name}/iter_350000.pth"
+        checkpoint_file = f"work_dirs/{config_name}/last_checkpoint"
 
-    if call_args['out_dir'] != '' and not (call_args['no_save_vis']
-                                           and call_args['no_save_pred']):
-        print_log(f'results have been saved at {call_args["out_dir"]}')
+    if not checkpoint_file.endswith('.pth'):
+        with open(checkpoint_file, 'r') as f:
+            checkpoint_file = f.readline().strip()
 
+    register_all_modules()
+
+    model = init_detector(config_file, checkpoint_file, device='cuda:0')
+
+    paths = glob(os.path.join(args.inputs, '*.jpg'))
+    paths += glob(os.path.join(args.inputs, '*.png'))
+    for img_path in tqdm(paths):
+        img = mmcv.imread(img_path, channel_order='bgr')    # bgr更好, -> rgb
+        h, w = img.shape[:2]
+        result = inference_detector(model, img)
+
+        visualizer = VISUALIZERS.build(model.cfg.visualizer)
+        visualizer.dataset_meta = model.dataset_meta
+        # set_trace()
+        save_path = os.path.join('result/', os.path.basename(img_path))
+        # show the results
+        visualizer.add_datasample(
+            'result',
+            img,
+            data_sample=result,
+            draw_gt=False,
+            wait_time=0,
+            pred_score_thr=0.015,
+            out_file=save_path
+        )
+        # visualizer.show()
 
 if __name__ == '__main__':
     main()

@@ -3,7 +3,8 @@ _base_ = ['./mask2former_r50_8xb2-lsj-50e_coco-panoptic.py']
 num_things_classes = 80
 num_stuff_classes = 0
 num_classes = num_things_classes + num_stuff_classes
-image_size = (1024, 1024)
+# image_size = (1024, 1024)
+image_size = (512, 512)
 batch_augments = [
     dict(
         type='BatchFixedSizePad',
